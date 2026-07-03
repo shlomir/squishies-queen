@@ -53,6 +53,18 @@
         }
         .reset-btn:active { transform: scale(.94); }
 
+        /* ── Version badge (bump patch on every change) ── */
+        .version-badge {
+            position: fixed; z-index: 5;
+            top: 8px; right: 8px;
+            background: rgba(255,255,255,.12);
+            border: 1.5px solid rgba(255,255,255,.28);
+            color: rgba(255,255,255,.85);
+            font-size: .7rem; font-weight: bold;
+            padding: 4px 10px; border-radius: 20px;
+            letter-spacing: .5px; pointer-events: none;
+        }
+
         /* ── Game wrap ── */
         .game-wrap {
             position: relative; z-index: 1;
@@ -285,6 +297,7 @@
 <div class="blob" style="width:220px;height:220px;background:#cc0033;bottom:5%;left:35%;"></div>
 
 <button class="reset-btn" onclick="openReset()">🔄 אתחול משחק</button>
+<div class="version-badge">v1.0.0</div>
 
 <div class="game-wrap">
 
