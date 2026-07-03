@@ -8,8 +8,8 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         /* Square symbol-button size: driven by the SMALLER of width or height,
-           so the whole board always fits one screen — no scroll, no clipping. */
-        :root { --btn: min(140px, 30vw, 15dvh); }
+           using svh (smallest viewport) so it fits even with the browser URL bar shown. */
+        :root { --btn: min(130px, 28vw, 14svh); }
 
         #stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
         .star {
@@ -29,7 +29,7 @@
 
         body {
             min-height: 100vh;
-            height: 100dvh;
+            height: 100svh;
             background: radial-gradient(ellipse at 50% 20%, #9b30ff 0%, #5b0fa0 30%, #2a0060 60%, #0d0030 100%);
             font-family: 'Arial Black', Arial, sans-serif;
             overflow: hidden;
@@ -56,11 +56,12 @@
         .game-wrap {
             position: relative; z-index: 1;
             width: min(460px, 96vw);
-            height: 100dvh;
-            max-height: 100dvh;
+            height: 100svh;
+            max-height: 100svh;
             display: flex; flex-direction: column;
             gap: 7px;
             padding: 8px 12px;
+            padding-bottom: max(14px, env(safe-area-inset-bottom));
             overflow: hidden;
         }
         /* Everything except the centre panel keeps its natural height */
