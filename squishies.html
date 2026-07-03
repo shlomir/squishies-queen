@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>הסקוויישים שלי</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+
+        html, body { height:100%; }
+        body {
+            min-height:100vh;
+            background: radial-gradient(ellipse at 50% 20%, #9b30ff 0%, #5b0fa0 30%, #2a0060 60%, #0d0030 100%);
+            font-family: 'Arial Black', Arial, sans-serif;
+            color: #fff;
+            display:flex; flex-direction:column;
+        }
+
+        /* ── Stars ── */
+        #stars { position:fixed; inset:0; pointer-events:none; z-index:0; }
+        .star {
+            position:absolute;
+            clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+            background:#ffd700;
+            animation:twinkle var(--dur,2s) ease-in-out infinite var(--delay,0s);
+        }
+        @keyframes twinkle {
+            0%,100%{opacity:.15;transform:scale(.6);}
+            50%{opacity:1;transform:scale(1.1);}
+        }
+        .blob {
+            position:fixed; border-radius:50%;
+            filter:blur(60px); opacity:.22; pointer-events:none; z-index:0;
+        }
+
+        /* ── Top nav (back to game) ── */
+        .topnav {
+            position:relative; z-index:2;
+            display:flex; justify-content:center;
+            padding:8px;
+        }
+        .back-btn {
+            background: rgba(255,255,255,.14);
+            border: 1.5px solid rgba(255,255,255,.28);
+            color:#fff; font-size:.85rem; font-weight:bold;
+            padding:7px 18px; border-radius:20px; cursor:pointer;
+            text-decoration:none;
+        }
+
+        /* ── Player half ── */
+        .player-half {
+            position:relative; z-index:1;
+            flex:1;
+            display:flex; flex-direction:column;
+            padding:10px 14px;
+            overflow-y:auto;
+            min-height:0;
+        }
+        .player-half.top {
+            transform: rotate(180deg);
+            border-bottom: 2px dashed rgba(255,255,255,.25);
+        }
+
+        .half-header {
+            display:flex; align-items:center; justify-content:space-between;
+            gap:10px; margin-bottom:10px;
+        }
+        .half-title {
+            font-size: clamp(1.1rem,4.5vw,1.5rem);
+            font-weight:900;
+            background: linear-gradient(135deg,#ff77dd,#bb44ff,#ff55bb);
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+            background-clip:text;
+            filter:drop-shadow(0 0 8px rgba(255,100,200,.6));
+            white-space:nowrap;
+        }
+        .add-btn {
+            background: linear-gradient(135deg,#ff44bb,#bb22ff);
+            border:none; color:#fff;
+            font-size:.9rem; font-weight:900;
+            padding:9px 16px; border-radius:12px;
+            cursor:pointer; font-family:inherit;
+            box-shadow:0 3px 16px rgba(255,80,200,.4);
+            white-space:nowrap;
+        }
+        .add-btn:active { transform:scale(.96); }
+
+        /* ── Grid ── */
+        .grid {
+            display:grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px,1fr));
+            gap:10px;
+            align-content:start;
+        }
+
+        /* ── Card ── */
+        .card {
+            background: radial-gradient(ellipse at 40% 30%, #8b28ef 0%, #4a0088 55%, #1e0044 100%);
+            border: 2px solid rgba(255,255,255,.15);
+            border-radius:14px;
+            padding:12px 10px 10px;
+            display:flex; flex-direction:column;
+            gap:6px;
+            box-shadow:0 4px 20px rgba(0,0,0,.4);
+            animation:card-in .3s cubic-bezier(.18,1.4,.4,1) both;
+        }
+        @keyframes card-in {
+            from{opacity:0;transform:scale(.8);}
+            to{opacity:1;transform:scale(1);}
+        }
+        .card-emoji { font-size:2.2rem; text-align:center; line-height:1; }
+        .card-name {
+            font-size:.9rem; font-weight:900;
+            color:#fff; text-align:center; word-break:break-word;
+        }
+        .card-notes {
+            font-size:.72rem; color:rgba(255,255,255,.6);
+            text-align:center; line-height:1.35; word-break:break-word;
+        }
+        .card-status {
+            text-align:center; font-size:.68rem; font-weight:bold;
+            padding:2px 8px; border-radius:12px; align-self:center;
+        }
+        .status-have { background:rgba(50,220,80,.25); color:#44ff88; border:1px solid rgba(50,220,80,.4); }
+        .status-want { background:rgba(255,180,0,.2);  color:#ffd700; border:1px solid rgba(255,180,0,.4); }
+
+        .card-actions { display:flex; gap:5px; justify-content:center; margin-top:2px; }
+        .card-btn {
+            flex:1;
+            background:rgba(255,255,255,.1);
+            border:1px solid rgba(255,255,255,.2);
+            color:#fff; font-size:.72rem; font-weight:bold;
+            padding:5px; border-radius:8px;
+            cursor:pointer; font-family:inherit;
+        }
+        .card-btn.del { color:#ff6666; border-color:rgba(255,50,50,.35); }
+
+        /* ── Empty state ── */
+        .empty {
+            grid-column:1/-1;
+            text-align:center; padding:24px 16px;
+            color:rgba(255,255,255,.4);
+            font-size:.9rem; line-height:1.8;
+        }
+        .empty-emoji { font-size:2.8rem; display:block; margin-bottom:8px; }
+
+        /* ── Modal ── */
+        .modal-bg {
+            position:fixed; inset:0; z-index:200;
+            background:rgba(5,0,20,.82);
+            display:flex; align-items:center; justify-content:center;
+            padding:16px; backdrop-filter:blur(4px);
+        }
+        .modal-bg.hidden { display:none; }
+        /* wrapper flips modal content for the top player */
+        .modal-bg.flip .modal, .modal-bg.flip .del-modal { transform: rotate(180deg); }
+
+        .modal {
+            background: radial-gradient(ellipse at 50% 20%, #7a20df 0%, #400085 50%, #1a0044 100%);
+            border:2px solid rgba(255,255,255,.2);
+            border-radius:20px;
+            padding:24px 20px 20px;
+            width:100%; max-width:340px;
+            box-shadow:0 12px 60px rgba(0,0,0,.7);
+            display:flex; flex-direction:column; gap:14px;
+            max-height:92vh; overflow-y:auto;
+        }
+        .modal-title {
+            font-size:1.3rem; font-weight:900;
+            background: linear-gradient(135deg,#ff77dd,#bb44ff);
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+            background-clip:text; text-align:center;
+        }
+        label {
+            display:flex; flex-direction:column; gap:5px;
+            font-size:.82rem; color:rgba(255,255,255,.7); font-weight:bold;
+        }
+        input[type=text], textarea, select {
+            background:rgba(255,255,255,.1);
+            border:1.5px solid rgba(255,255,255,.25);
+            border-radius:10px;
+            color:#fff; font-size:1rem;
+            padding:10px 12px; font-family:inherit;
+            outline:none; resize:none; direction:rtl;
+        }
+        input[type=text]:focus, textarea:focus, select:focus { border-color:rgba(255,100,200,.7); }
+        select option { background:#2a0060; color:#fff; }
+
+        .emoji-row { display:flex; flex-wrap:wrap; gap:6px; }
+        .ep {
+            font-size:1.5rem; padding:4px 6px; border-radius:8px;
+            cursor:pointer; border:2px solid transparent;
+            line-height:1; background:rgba(255,255,255,.08);
+        }
+        .ep.selected { border-color:#ff77dd; background:rgba(255,100,200,.2); }
+
+        .modal-actions { display:flex; gap:10px; }
+        .save-btn {
+            flex:1;
+            background:linear-gradient(135deg,#ff44bb,#bb22ff);
+            border:none; color:#fff; font-size:1rem; font-weight:900;
+            padding:12px; border-radius:12px; cursor:pointer; font-family:inherit;
+        }
+        .cancel-btn {
+            flex:0 0 auto;
+            background:rgba(255,255,255,.1);
+            border:1.5px solid rgba(255,255,255,.2);
+            color:#fff; font-size:1rem; font-weight:bold;
+            padding:12px 20px; border-radius:12px; cursor:pointer; font-family:inherit;
+        }
+
+        .del-modal {
+            background: radial-gradient(ellipse at 50% 20%, #7a20df 0%, #400085 50%, #1a0044 100%);
+            border:2px solid rgba(255,50,50,.4);
+            border-radius:20px; padding:24px 20px 20px;
+            width:100%; max-width:300px;
+            box-shadow:0 12px 60px rgba(0,0,0,.7);
+            display:flex; flex-direction:column; gap:14px; text-align:center;
+        }
+        .del-modal p { color:rgba(255,255,255,.85); font-size:1rem; line-height:1.5; }
+        .del-confirm-btn {
+            background:linear-gradient(135deg,#ff2222,#aa0000);
+            border:none; color:#fff; font-size:1rem; font-weight:900;
+            padding:12px; border-radius:12px; cursor:pointer; font-family:inherit;
+        }
+    </style>
+</head>
+<body>
+
+<div id="stars"></div>
+<div class="blob" style="width:320px;height:320px;background:#cc0044;top:5%;left:-8%;"></div>
+<div class="blob" style="width:260px;height:260px;background:#8800ff;top:50%;right:-6%;"></div>
+
+<!-- Player 2 (top) — flipped -->
+<div class="player-half top">
+    <div class="half-header">
+        <div class="half-title" id="titleP2">👑 שחקנית 2</div>
+        <button class="add-btn" onclick="openAdd('p2')">＋ הוסיפי סקוויישי</button>
+    </div>
+    <div class="grid" id="gridP2"></div>
+</div>
+
+<!-- Back to game -->
+<div class="topnav"><a class="back-btn" href="index.html">← חזרה למשחק</a></div>
+
+<!-- Player 1 (bottom) — normal -->
+<div class="player-half bottom">
+    <div class="half-header">
+        <div class="half-title" id="titleP1">👑 שחקנית 1</div>
+        <button class="add-btn" onclick="openAdd('p1')">＋ הוסיפי סקוויישי</button>
+    </div>
+    <div class="grid" id="gridP1"></div>
+</div>
+
+<!-- ── Add/Edit modal ── -->
+<div class="modal-bg hidden" id="modalBg">
+    <div class="modal">
+        <div class="modal-title" id="modalTitle">סקוויישי חדש ✨</div>
+        <label>שם הסקוויישי
+            <input type="text" id="fName" placeholder="למשל: חד קרן ורוד" maxlength="40">
+        </label>
+        <label>בחרי אמוג׳י
+            <div class="emoji-row" id="emojiRow"></div>
+        </label>
+        <label>הערות (אופציונלי)
+            <textarea id="fNotes" rows="2" placeholder="צבע, גודל, מאיפה קנית..."></textarea>
+        </label>
+        <label>סטטוס
+            <select id="fStatus">
+                <option value="have">יש לי ✅</option>
+                <option value="want">רוצה 🌟</option>
+            </select>
+        </label>
+        <div class="modal-actions">
+            <button class="cancel-btn" onclick="closeModal()">ביטול</button>
+            <button class="save-btn" onclick="save()">שמירה 💾</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Delete confirm modal ── -->
+<div class="modal-bg hidden" id="delBg">
+    <div class="del-modal">
+        <div style="font-size:2.5rem">🗑️</div>
+        <p>בטוחה שאת רוצה למחוק את <strong id="delName"></strong>?</p>
+        <button class="del-confirm-btn" onclick="confirmDelete()">כן, מחקי!</button>
+        <button class="cancel-btn" style="margin-top:-8px" onclick="closeDelModal()">ביטול</button>
+    </div>
+</div>
+
+<script>
+// ── Stars ──
+(function(){
+    const c=document.getElementById('stars');
+    for(let i=0;i<50;i++){
+        const s=document.createElement('div');s.className='star';
+        const sz=6+Math.random()*20;
+        s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--dur:${1.4+Math.random()*2}s;--delay:${Math.random()*3}s`;
+        c.appendChild(s);
+    }
+})();
+
+// ── Emoji options ──
+const EMOJIS = ['🦄','🐱','🐶','🐰','🐸','🦊','🐼','🍓','🍦','🌈','⭐','💜','🎀','🌸','🦋','🍩','🧸','🌺','💎','🦩'];
+let selectedEmoji = EMOJIS[0];
+
+(function buildEmojiPicker(){
+    const row=document.getElementById('emojiRow');
+    EMOJIS.forEach(e=>{
+        const btn=document.createElement('button');
+        btn.type='button'; btn.className='ep'; btn.textContent=e;
+        if(e===selectedEmoji) btn.classList.add('selected');
+        btn.onclick=()=>{
+            selectedEmoji=e;
+            row.querySelectorAll('.ep').forEach(b=>b.classList.remove('selected'));
+            btn.classList.add('selected');
+        };
+        row.appendChild(btn);
+    });
+})();
+
+// ── Storage: separate key per player ──
+const KEYS = { p1:'squishies_p1', p2:'squishies_p2' };
+const GRIDS = { p1:'gridP1', p2:'gridP2' };
+
+function load(player){ try{return JSON.parse(localStorage.getItem(KEYS[player]))||[];}catch{return[];} }
+function persist(player,arr){ localStorage.setItem(KEYS[player],JSON.stringify(arr)); }
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Render one player's grid ──
+function renderPlayer(player){
+    const arr=load(player);
+    const grid=document.getElementById(GRIDS[player]);
+    grid.innerHTML='';
+    if(arr.length===0){
+        grid.innerHTML='<div class="empty"><span class="empty-emoji">🧸</span>עוד אין סקוויישים<br>לחצי להוסיף!</div>';
+        return;
+    }
+    arr.forEach((item,i)=>{
+        const card=document.createElement('div');
+        card.className='card';
+        card.style.animationDelay=(i*0.04)+'s';
+        const statusCls=item.status==='have'?'status-have':'status-want';
+        const statusTxt=item.status==='have'?'יש לי ✅':'רוצה 🌟';
+        card.innerHTML=`
+            <div class="card-emoji">${item.emoji||'🧸'}</div>
+            <div class="card-name">${esc(item.name)}</div>
+            ${item.notes?`<div class="card-notes">${esc(item.notes)}</div>`:''}
+            <span class="card-status ${statusCls}">${statusTxt}</span>
+            <div class="card-actions">
+                <button class="card-btn" onclick="openEdit('${player}',${i})">✏️ עריכה</button>
+                <button class="card-btn del" onclick="openDelete('${player}',${i})">🗑️</button>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+function renderAll(){ renderPlayer('p1'); renderPlayer('p2'); }
+
+// ── Modal state ──
+let curPlayer='p1';
+let editIndex=-1;
+let deleteState={player:'p1',index:-1};
+
+function applyFlip(bgId){
+    // top player's modal is flipped so it faces them
+    const bg=document.getElementById(bgId);
+    bg.classList.toggle('flip', curPlayer==='p2');
+}
+
+function openAdd(player){
+    curPlayer=player; editIndex=-1;
+    document.getElementById('modalTitle').textContent='סקוויישי חדש ✨';
+    document.getElementById('fName').value='';
+    document.getElementById('fNotes').value='';
+    document.getElementById('fStatus').value='have';
+    setEmoji(EMOJIS[0]);
+    applyFlip('modalBg');
+    document.getElementById('modalBg').classList.remove('hidden');
+    setTimeout(()=>document.getElementById('fName').focus(),100);
+}
+
+function openEdit(player,i){
+    curPlayer=player; editIndex=i;
+    const item=load(player)[i];
+    document.getElementById('modalTitle').textContent='עריכת סקוויישי ✏️';
+    document.getElementById('fName').value=item.name;
+    document.getElementById('fNotes').value=item.notes||'';
+    document.getElementById('fStatus').value=item.status||'have';
+    setEmoji(item.emoji||EMOJIS[0]);
+    applyFlip('modalBg');
+    document.getElementById('modalBg').classList.remove('hidden');
+    setTimeout(()=>document.getElementById('fName').focus(),100);
+}
+
+function setEmoji(e){
+    selectedEmoji=e;
+    document.querySelectorAll('.ep').forEach(b=>b.classList.toggle('selected',b.textContent===e));
+}
+
+function closeModal(){ document.getElementById('modalBg').classList.add('hidden'); }
+
+function save(){
+    const name=document.getElementById('fName').value.trim();
+    if(!name){ document.getElementById('fName').focus(); return; }
+    const arr=load(curPlayer);
+    const item={
+        name,
+        emoji:selectedEmoji,
+        notes:document.getElementById('fNotes').value.trim(),
+        status:document.getElementById('fStatus').value
+    };
+    if(editIndex===-1){ arr.push(item); }
+    else { arr[editIndex]=item; }
+    persist(curPlayer,arr);
+    closeModal();
+    renderPlayer(curPlayer);
+}
+
+// ── Delete ──
+function openDelete(player,i){
+    deleteState={player,index:i};
+    curPlayer=player;
+    document.getElementById('delName').textContent=load(player)[i].name;
+    applyFlip('delBg');
+    document.getElementById('delBg').classList.remove('hidden');
+}
+function closeDelModal(){ document.getElementById('delBg').classList.add('hidden'); }
+function confirmDelete(){
+    const {player,index}=deleteState;
+    const arr=load(player);
+    arr.splice(index,1);
+    persist(player,arr);
+    closeDelModal();
+    renderPlayer(player);
+}
+
+// ── Close on backdrop click ──
+document.getElementById('modalBg').addEventListener('click',e=>{
+    if(e.target===document.getElementById('modalBg')) closeModal();
+});
+document.getElementById('delBg').addEventListener('click',e=>{
+    if(e.target===document.getElementById('delBg')) closeDelModal();
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeModal();closeDelModal();} });
+
+// ── Player names (from game page) ──
+function loadTitles(){
+    const n1=(localStorage.getItem('playerName_p1')||'').trim();
+    const n2=(localStorage.getItem('playerName_p2')||'').trim();
+    document.getElementById('titleP1').textContent='👑 '+(n1||'שחקנית 1');
+    document.getElementById('titleP2').textContent='👑 '+(n2||'שחקנית 2');
+}
+
+// ── Init ──
+loadTitles();
+renderAll();
+</script>
+</body>
+</html>
