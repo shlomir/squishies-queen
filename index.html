@@ -82,6 +82,14 @@
             cursor: pointer; text-decoration: none;
             font-family: inherit; white-space: nowrap;
         }
+        .mic-link {
+            background: rgba(255,255,255,.15);
+            border: 1.5px solid rgba(255,255,255,.3);
+            color: #fff; font-size: 1rem;
+            padding: 6px 10px; border-radius: 20px;
+            cursor: pointer; font-family: inherit; line-height: 1;
+        }
+        .mic-link:active { transform: scale(.92); }
 
         /* ── Player hint labels ── */
         .player-hint {
@@ -214,6 +222,49 @@
             color: #fff; font-size: 1rem; font-weight: bold;
             padding: 12px; border-radius: 12px; cursor: pointer; font-family: inherit;
         }
+
+        /* flip whole modal for the top player */
+        .modal-bg.flip .modal { transform: rotate(180deg); }
+
+        /* ── Voice recording modal ── */
+        .voice-modal {
+            background: radial-gradient(ellipse at 50% 20%, #7a20df 0%, #400085 50%, #1a0044 100%);
+            border: 2px solid rgba(255,255,255,.22);
+            border-radius: 20px; padding: 22px 20px 18px;
+            width: 100%; max-width: 360px;
+            display: flex; flex-direction: column; gap: 14px;
+            box-shadow: 0 12px 60px rgba(0,0,0,.7);
+            max-height: 92vh; overflow-y: auto;
+        }
+        .voice-title {
+            font-size: 1.25rem; font-weight: 900; text-align: center;
+            background: linear-gradient(135deg,#ff77dd,#bb44ff);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .voice-hint { color: rgba(255,255,255,.6); font-size: .78rem; text-align: center; line-height: 1.5; }
+        .v-row {
+            display: flex; align-items: center; gap: 8px;
+            background: rgba(255,255,255,.07);
+            border: 1px solid rgba(255,255,255,.15);
+            border-radius: 12px; padding: 10px 12px;
+        }
+        .v-label { flex: 1; font-size: .92rem; font-weight: bold; color: #fff; }
+        .v-status { font-size: .72rem; white-space: nowrap; }
+        .v-status.has { color: #44ff88; }
+        .v-status.rec { color: #ff5555; }
+        .v-status.none { color: rgba(255,255,255,.4); }
+        .v-btns { display: flex; gap: 5px; }
+        .v-btn {
+            background: rgba(255,255,255,.14);
+            border: 1px solid rgba(255,255,255,.25);
+            color: #fff; font-size: .95rem;
+            padding: 6px 9px; border-radius: 9px;
+            cursor: pointer; font-family: inherit; line-height: 1;
+        }
+        .v-btn.rec { background: rgba(255,50,50,.3); border-color: rgba(255,80,80,.6); }
+        .v-btn.stop { background: rgba(255,180,0,.3); border-color: rgba(255,200,0,.6); }
+        .v-btn.del { color: #ff8888; }
     </style>
 </head>
 <body>
@@ -230,6 +281,7 @@
     <!-- Player 2 (top) — flipped -->
     <div class="ctrl-bar flipped">
         <input class="name-input" id="nameP2" placeholder="השם שלי..." maxlength="20" oninput="saveName('p2',this.value)">
+        <button class="mic-link" onclick="openVoice('p2')" title="הקלטות קול">🎤</button>
         <a class="nav-link" href="squishies.html">🧸 הסקוויישים שלי</a>
     </div>
     <div class="player-hint flipped">לחצי על כפתור ✓ + ✗</div>
@@ -258,9 +310,20 @@
     <div class="player-hint">לחצי על כפתור ✓ + ✗</div>
     <div class="ctrl-bar">
         <input class="name-input" id="nameP1" placeholder="השם שלי..." maxlength="20" oninput="saveName('p1',this.value)">
+        <button class="mic-link" onclick="openVoice('p1')" title="הקלטות קול">🎤</button>
         <a class="nav-link" href="squishies.html">🧸 הסקוויישים שלי</a>
     </div>
 
+</div>
+
+<!-- ── Voice recording modal ── -->
+<div class="modal-bg hidden" id="voiceBg">
+    <div class="voice-modal">
+        <div class="voice-title" id="voiceTitle">🎤 ההקלטות שלי</div>
+        <div class="voice-hint">הקליטי קול לכל כפתור (עד 3 שניות).<br>הקול יישמע כשלוחצים על הכפתור.</div>
+        <div id="voiceRows"></div>
+        <button class="btn-cancel" onclick="closeVoice()">סגירה</button>
+    </div>
 </div>
 
 <!-- ── Reset confirm modal ── -->
@@ -310,6 +373,7 @@ const clearTimers = { top: null, bottom: null };
 
 function respond(type, player) {
     const { emoji, text } = RESPONSES[type];
+    playVoice(player, type);
     const zone = document.getElementById(player === 'top' ? 'zoneTop' : 'zoneBottom');
     zone.innerHTML = `
         <div class="response-emoji">${emoji}</div>
@@ -331,6 +395,129 @@ function respond(type, player) {
     });
 }
 
+// ── Voice recordings (per player, per action) ──
+// button "player" arg is 'top'/'bottom'; storage uses 'p2'/'p1'
+const VOICE_ACTIONS = [
+    { type:'ok', key:'ok',   label:'🥰 תודה' },
+    { type:'+',  key:'plus', label:'🙏 תוסיפי בבקשה' },
+    { type:'x',  key:'x',    label:'😒 לא שווה לי' }
+];
+function zoneToPlayer(z){ return z === 'top' ? 'p2' : 'p1'; }
+function actionKey(type){ return type === '+' ? 'plus' : type; }
+function voiceKey(pk, key){ return `voice_${pk}_${key}`; }
+
+// Play a player's recording for this action; fall back to spoken Hebrew
+function playVoice(zone, type){
+    const pk = zoneToPlayer(zone);
+    const data = localStorage.getItem(voiceKey(pk, actionKey(type)));
+    if (data){
+        const a = new Audio(data);
+        a.play().catch(()=>{});
+    } else if (window.speechSynthesis){
+        try {
+            const u = new SpeechSynthesisUtterance(RESPONSES[type].text);
+            u.lang = 'he-IL'; u.rate = 1;
+            speechSynthesis.cancel();
+            speechSynthesis.speak(u);
+        } catch(e){}
+    }
+}
+
+// ── Recording state ──
+let curVoicePlayer = 'p1';       // 'p1' | 'p2'
+let mediaRec = null, recChunks = [], recStream = null, recTimer = null, recActive = null;
+
+function openVoice(pk){
+    curVoicePlayer = pk;
+    document.getElementById('voiceTitle').textContent = '🎤 ההקלטות של ' +
+        ((localStorage.getItem(NAME_KEYS[pk])||'').trim() || (pk==='p1'?'שחקנית 1':'שחקנית 2'));
+    const bg = document.getElementById('voiceBg');
+    bg.classList.toggle('flip', pk === 'p2');   // face the top player
+    renderVoiceRows();
+    bg.classList.remove('hidden');
+}
+function closeVoice(){
+    if (recActive) stopRec();
+    document.getElementById('voiceBg').classList.add('hidden');
+}
+
+function renderVoiceRows(){
+    const pk = curVoicePlayer;
+    const rows = VOICE_ACTIONS.map(a=>{
+        const has = !!localStorage.getItem(voiceKey(pk, a.key));
+        const recording = recActive && recActive.pk === pk && recActive.key === a.key;
+        let status, btns;
+        if (recording){
+            status = '<span class="v-status rec">🔴 מקליט...</span>';
+            btns = `<button class="v-btn stop" onclick="stopRec()">⏹</button>`;
+        } else {
+            status = has ? '<span class="v-status has">✅ מוקלט</span>'
+                         : '<span class="v-status none">—</span>';
+            btns = `<button class="v-btn rec" onclick="startRec('${pk}','${a.key}')">🎤</button>`;
+            if (has){
+                btns += `<button class="v-btn" onclick="previewVoice('${pk}','${a.key}')">▶️</button>`;
+                btns += `<button class="v-btn del" onclick="delVoice('${pk}','${a.key}')">🗑️</button>`;
+            }
+        }
+        return `<div class="v-row" style="margin-bottom:8px">
+            <span class="v-label">${a.label}</span>
+            ${status}
+            <span class="v-btns">${btns}</span>
+        </div>`;
+    }).join('');
+    document.getElementById('voiceRows').innerHTML = rows;
+}
+
+async function startRec(pk, key){
+    if (recActive) return;
+    if (!navigator.mediaDevices || !window.MediaRecorder){
+        alert('הדפדפן לא תומך בהקלטה'); return;
+    }
+    try {
+        recStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    } catch(e){
+        alert('צריך לאשר גישה למיקרופון 🎤'); return;
+    }
+    recChunks = [];
+    let mime = '';
+    if (MediaRecorder.isTypeSupported('audio/webm')) mime = 'audio/webm';
+    else if (MediaRecorder.isTypeSupported('audio/mp4')) mime = 'audio/mp4';
+    mediaRec = mime ? new MediaRecorder(recStream,{mimeType:mime}) : new MediaRecorder(recStream);
+    recActive = { pk, key };
+    mediaRec.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
+    mediaRec.onstop = () => {
+        const blob = new Blob(recChunks, { type: mediaRec.mimeType || 'audio/webm' });
+        const reader = new FileReader();
+        reader.onload = () => {
+            try { localStorage.setItem(voiceKey(pk, key), reader.result); }
+            catch(err){ alert('ההקלטה גדולה מדי, נסי הקלטה קצרה יותר'); }
+            recActive = null;
+            renderVoiceRows();
+        };
+        reader.readAsDataURL(blob);
+        if (recStream) recStream.getTracks().forEach(t=>t.stop());
+    };
+    mediaRec.start();
+    renderVoiceRows();                       // show "recording" state
+    recTimer = setTimeout(stopRec, 3000);    // auto-stop after 3s
+}
+function stopRec(){
+    clearTimeout(recTimer);
+    if (mediaRec && mediaRec.state !== 'inactive') mediaRec.stop();
+}
+function previewVoice(pk, key){
+    const data = localStorage.getItem(voiceKey(pk, key));
+    if (data){ const a = new Audio(data); a.play().catch(()=>{}); }
+}
+function delVoice(pk, key){
+    localStorage.removeItem(voiceKey(pk, key));
+    renderVoiceRows();
+}
+
+document.getElementById('voiceBg').addEventListener('click',e=>{
+    if (e.target === document.getElementById('voiceBg')) closeVoice();
+});
+
 // ── Reset game ──
 function openReset(){ document.getElementById('resetBg').classList.remove('hidden'); }
 function closeReset(){ document.getElementById('resetBg').classList.add('hidden'); }
@@ -340,6 +527,8 @@ function doReset(){
     localStorage.removeItem('squishies_p2');
     localStorage.removeItem(NAME_KEYS.p1);
     localStorage.removeItem(NAME_KEYS.p2);
+    ['p1','p2'].forEach(pk => VOICE_ACTIONS.forEach(a =>
+        localStorage.removeItem(voiceKey(pk, a.key))));
     // reset the board
     document.getElementById('nameP1').value = '';
     document.getElementById('nameP2').value = '';
@@ -353,7 +542,7 @@ function doReset(){
 document.getElementById('resetBg').addEventListener('click',e=>{
     if(e.target===document.getElementById('resetBg')) closeReset();
 });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeReset(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeReset(); closeVoice(); } });
 </script>
 </body>
 </html>
