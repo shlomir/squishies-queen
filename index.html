@@ -41,17 +41,19 @@
             position: relative;
         }
 
-        /* ── Reset button (shared, fixed) ── */
+        /* ── Reset button (fixed, centre-left, rotated 90°) ── */
         .reset-btn {
             position: fixed; z-index: 5;
-            top: 8px; left: 8px;
+            top: 50%; left: 8px;
+            transform: translateY(-50%) rotate(-90deg);
+            transform-origin: center;
             background: rgba(255,60,60,.2);
             border: 1.5px solid rgba(255,80,80,.5);
             color: #ffb3b3; font-size: .78rem; font-weight: bold;
             padding: 6px 14px; border-radius: 20px;
-            cursor: pointer; font-family: inherit;
+            cursor: pointer; font-family: inherit; white-space: nowrap;
         }
-        .reset-btn:active { transform: scale(.94); }
+        .reset-btn:active { transform: translateY(-50%) rotate(-90deg) scale(.94); }
 
         /* ── Version badge (bump patch on every change) ── */
         .version-badge {
@@ -202,6 +204,33 @@
             text-align: center;
         }
 
+        /* ── Squishies collection shown in each player's zone ── */
+        .sq-wrap {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 5px; width: 100%; max-height: 100%; min-height: 0;
+        }
+        .sq-title {
+            font-size: .7rem; font-weight: bold;
+            color: rgba(255,255,255,.85);
+            text-shadow: 0 1px 4px rgba(0,0,0,.9);
+        }
+        .sq-list {
+            display: flex; flex-wrap: wrap; gap: 5px;
+            justify-content: center; align-content: flex-start;
+            overflow-y: auto; max-height: 100%; padding: 2px;
+        }
+        .sq-chip {
+            display: flex; flex-direction: column; align-items: center; gap: 1px;
+            background: rgba(255,255,255,.12);
+            border: 1px solid rgba(255,255,255,.25);
+            border-radius: 10px; padding: 3px 7px; min-width: 42px;
+        }
+        .sq-emoji { font-size: 1.35rem; line-height: 1; }
+        .sq-name {
+            font-size: .58rem; color: #fff; max-width: 62px;
+            text-align: center; word-break: break-word; line-height: 1.1;
+        }
+
         @keyframes pop-in {
             0%   { opacity:0; transform:scale(.5); }
             100% { opacity:1; transform:scale(1); }
@@ -297,7 +326,7 @@
 <div class="blob" style="width:220px;height:220px;background:#cc0033;bottom:5%;left:35%;"></div>
 
 <button class="reset-btn" onclick="openReset()">🔄 אתחול משחק</button>
-<div class="version-badge">v1.0.0</div>
+<div class="version-badge">v1.0.1</div>
 
 <div class="game-wrap">
 
@@ -391,8 +420,27 @@ const RESPONSES = {
     x:  { emoji: '😒', text: 'לא שווה לי' }
 };
 const FLASH = { ok: 'flash-green', '+': 'flash-yellow', x: 'flash-red' };
-const IDLE_HTML = '<div class="idle-text">לחצי על כפתור ✓ + ✗</div>';
 const clearTimers = { top: null, bottom: null };
+
+// ── Idle content: show that player's owned (✅) squishies ──
+const SQ_KEYS = { top: 'squishies_p2', bottom: 'squishies_p1' };
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function idleHtml(player){
+    let arr = [];
+    try { arr = JSON.parse(localStorage.getItem(SQ_KEYS[player])) || []; } catch {}
+    const have = arr.filter(s => s.status === 'have');
+    if (!have.length) {
+        return '<div class="idle-text">לחצי על כפתור ✓ + ✗</div>';
+    }
+    const chips = have.map(s =>
+        `<div class="sq-chip"><span class="sq-emoji">${s.emoji || '🧸'}</span><span class="sq-name">${esc(s.name)}</span></div>`
+    ).join('');
+    return `<div class="sq-wrap"><div class="sq-title">🧸 הסקוויישים שלי</div><div class="sq-list">${chips}</div></div>`;
+}
+function renderIdle(player){
+    document.getElementById(player === 'top' ? 'zoneTop' : 'zoneBottom').innerHTML = idleHtml(player);
+}
 
 function respond(type, player) {
     const { emoji, text } = RESPONSES[type];
@@ -403,7 +451,7 @@ function respond(type, player) {
         <div class="response-text">${text}</div>
     `;
     clearTimeout(clearTimers[player]);
-    clearTimers[player] = setTimeout(() => { zone.innerHTML = IDLE_HTML; }, 3000);
+    clearTimers[player] = setTimeout(() => { zone.innerHTML = idleHtml(player); }, 3000);
 
     const cls = FLASH[type];
     const btnClass = type === 'ok' ? 'ok-btn' : type === '+' ? 'pl-btn' : 'x-btn';
@@ -555,8 +603,8 @@ function doReset(){
     // reset the board
     document.getElementById('nameP1').value = '';
     document.getElementById('nameP2').value = '';
-    document.getElementById('zoneTop').innerHTML = IDLE_HTML;
-    document.getElementById('zoneBottom').innerHTML = IDLE_HTML;
+    renderIdle('top');
+    renderIdle('bottom');
     clearTimeout(clearTimers.top);
     clearTimeout(clearTimers.bottom);
     closeReset();
@@ -566,6 +614,10 @@ document.getElementById('resetBg').addEventListener('click',e=>{
     if(e.target===document.getElementById('resetBg')) closeReset();
 });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeReset(); closeVoice(); } });
+
+// ── Show each player's owned squishies on load ──
+renderIdle('top');
+renderIdle('bottom');
 </script>
 </body>
 </html>
